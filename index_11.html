@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PuneDeliver — Local Delivery Optimizer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+:root {
+  --bg:      #f0f3f9;
+  --surf:    #ffffff;
+  --surf2:   #f5f7fb;
+  --surf3:   #edf0f7;
+  --bdr:     #dce3ee;
+  --bdr2:    #c3cedd;
+  --blue:    #1a6bff;
+  --blue-dk: #1254d0;
+  --blue-lt: #e9f0ff;
+  --blue-md: #9db8ff;
+  --trip0:   #1a6bff;
+  --trip1:   #0ca85a;
+  --trip2:   #e07b09;
+  --trip3:   #7730e8;
+  --tc-clear:   #22c55e;
+  --tc-mod:     #f59e0b;
+  --tc-heavy:   #ef4444;
+  --tc-neutral: #94a3b8;
+  --green:   #0ca85a;
+  --green-lt:#edfaf4;
+  --red:     #e0342e;
+  --red-lt:  #fff0ef;
+  --t1: #0b1828;
+  --t2: #2f3f55;
+  --t3: #5a6e88;
+  --t4: #8fa3bb;
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --rr: 7px;  --rm: 11px;  --rl: 15px;
+  --s0: 0 1px 3px rgba(11,24,40,.06),0 1px 2px rgba(11,24,40,.04);
+  --s1: 0 2px 8px rgba(11,24,40,.08),0 1px 3px rgba(11,24,40,.04);
+  --s2: 0 4px 18px rgba(11,24,40,.10),0 2px 5px rgba(11,24,40,.05);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  font-size: 13.5px; line-height: 1.55;
+  color: var(--t2); background: var(--bg);
+  display: flex; flex-direction: column;
+}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bdr2); border-radius: 3px; }
+
+header {
+  height: 54px; padding: 0 18px;
+  background: var(--surf); border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; box-shadow: var(--s0); z-index: 40;
+}
+.hb { display: flex; align-items: center; gap: 10px; }
+.hb-icon {
+  width: 34px; height: 34px; background: var(--blue);
+  border-radius: var(--rr); display: flex; align-items: center;
+  justify-content: center; font-size: 18px;
+  box-shadow: 0 2px 10px rgba(26,107,255,.28); flex-shrink: 0;
+}
+.hb-name { font-size: 16px; font-weight: 800; color: var(--t1); letter-spacing: -.3px; }
+.hb-name em { color: var(--blue); font-style: normal; }
+.hb-sub  { font-size: 10.5px; color: var(--t4); }
+.hb-pills { display: flex; align-items: center; gap: 8px; }
+.hp {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600;
+  background: var(--surf2); border: 1px solid var(--bdr); color: var(--t3);
+}
+.hp.blue { background: var(--blue-lt); border-color: var(--blue-md); color: var(--blue); }
+
+.app {
+  flex: 1; display: grid;
+  grid-template-columns: 292px 1fr 330px;
+  overflow: hidden; min-height: 0;
+}
+
+.left {
+  background: var(--surf); border-right: 1px solid var(--bdr);
+  display: flex; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+.pane-hd {
+  padding: 12px 14px 9px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+}
+.pane-title {
+  font-size: 10.5px; font-weight: 700; color: var(--t3);
+  text-transform: uppercase; letter-spacing: .09em;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pane-sub { font-size: 11.5px; color: var(--t4); margin-top: 2px; }
+.order-list {
+  flex: 1 1 0; overflow-y: auto; min-height: 0;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 7px;
+}
+.ocard {
+  background: var(--surf2); border: 1px solid var(--bdr);
+  border-radius: var(--rm); padding: 9px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; flex-shrink: 0;
+  animation: oIn .2s ease both; transition: box-shadow .15s;
+}
+@keyframes oIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ocard:hover { box-shadow: var(--s1); }
+.ocard-num {
+  position: absolute; top: 9px; left: 10px;
+  font-size: 9px; font-weight: 700; color: var(--t4); font-family: var(--mono);
+}
+.ocard-loc { padding-left: 22px; }
+.ocard-row {
+  display: grid; grid-template-columns: 1fr 1fr 26px;
+  gap: 5px; align-items: end; padding-left: 22px;
+}
+.fl { display: flex; flex-direction: column; gap: 2px; }
+.fl-lbl {
+  font-size: 9px; font-weight: 700; color: var(--t4);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+select, input[type=number] {
+  width: 100%; padding: 5px 8px;
+  background: #ffffff; border: 1px solid var(--bdr2);
+  border-radius: var(--rr);
+  font-family: var(--font); font-size: 12.5px; color: #0b1828;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none; appearance: none;
+}
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6e88'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+  padding-right: 24px; cursor: pointer;
+}
+select option { color: #0b1828; background: #ffffff; }
+select:focus, input[type=number]:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,107,255,.12);
+}
+input[type=number]::-webkit-inner-spin-button { opacity: .4; }
+.inp-w.err { border-color: var(--red) !important; box-shadow: 0 0 0 3px rgba(224,52,46,.12) !important; }
+.weight-err { font-size: 10px; color: var(--red); font-weight: 600; display: none; margin-top: 1px; }
+.weight-err.show { display: block; }
+.btn-rm {
+  width: 26px; height: 26px; border: 1px solid var(--bdr2);
+  border-radius: var(--rr); background: var(--surf);
+  color: var(--t4); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; flex-shrink: 0; align-self: flex-end;
+}
+.btn-rm:hover { background: var(--red-lt); border-color: #fca5a5; color: var(--red); }
+.left-foot {
+  padding: 9px 10px; border-top: 1px solid var(--bdr);
+  flex-shrink: 0; display: flex; flex-direction: column; gap: 7px;
+}
+.oq-row { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--t3); }
+.oq-row strong { color: var(--t1); font-weight: 700; }
+.oq-bar { height: 3px; background: var(--bdr); border-radius: 999px; overflow: hidden; }
+.oq-fill { height: 100%; background: var(--blue); border-radius: 999px; transition: width .3s; }
+.btn-add {
+  width: 100%; padding: 8px;
+  background: var(--surf2); border: 1.5px dashed var(--bdr2);
+  border-radius: var(--rm); font-family: var(--font);
+  font-size: 12.5px; font-weight: 600; color: var(--t3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
+  transition: all .15s;
+}
+.btn-add:hover { background: var(--blue-lt); border-color: var(--blue-md); color: var(--blue); }
+.btn-add:disabled { opacity: .45; pointer-events: none; }
+.btn-gen {
+  width: 100%; padding: 11px; background: var(--blue); border: none;
+  border-radius: var(--rm); font-family: var(--font);
+  font-size: 14px; font-weight: 700; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  box-shadow: 0 2px 12px rgba(26,107,255,.28);
+  transition: background .15s, box-shadow .15s, transform .1s;
+}
+.btn-gen:hover { background: var(--blue-dk); box-shadow: 0 4px 18px rgba(26,107,255,.36); }
+.btn-gen:active { transform: scale(.985); }
+.btn-gen:disabled { background: var(--blue-md); box-shadow: none; cursor: not-allowed; }
+
+.map-wrap {
+  position: relative; background: #eaeff7; overflow: hidden;
+}
+.map-wrap::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle, #b3bfd2 1px, transparent 1px);
+  background-size: 28px 28px; background-position: 14px 14px;
+  pointer-events: none; opacity: .45; z-index: 0;
+}
+#vis-net { width: 100%; height: 100%; position: relative; z-index: 1; }
+.map-tag {
+  position: absolute; top: 12px; left: 12px; z-index: 6;
+  background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--rr);
+  padding: 4px 10px; font-size: 10.5px; font-weight: 700;
+  color: var(--t3); letter-spacing: .05em; text-transform: uppercase;
+  box-shadow: var(--s0);
+}
+.map-tag.unlocked {
+  background: #fffbea;
+  border-color: #fbbf24;
+  color: #92400e;
+}
+.map-leg {
+  position: absolute; bottom: 12px; left: 12px; z-index: 6;
+  background: var(--surf); border: 1px solid var(--bdr);
+  border-radius: var(--rm); padding: 10px 13px; box-shadow: var(--s1);
+  min-width: 178px;
+}
+.ml-title {
+  font-size: 9.5px; font-weight: 700; color: var(--t4);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 7px;
+}
+.ml-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--t2); margin-bottom: 4px;
+}
+.ml-row:last-child { margin-bottom: 0; }
+.ml-sep { border-top: 1px solid var(--bdr); margin: 5px 0; }
+.ml-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ml-box  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.ml-line { width: 22px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+.map-controls-row {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--bdr);
+}
+.ctrl-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.ctrl-label {
+  font-size: 10.5px; font-weight: 700; color: var(--t3);
+  text-transform: uppercase; letter-spacing: .05em;
+  user-select: none;
+}
+.toggle-sw { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle-sw input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--bdr2); cursor: pointer; transition: background .2s;
+}
+.toggle-track::after {
+  content: ''; position: absolute;
+  top: 3px; left: 3px; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-sw input:checked + .toggle-track { background: var(--blue); }
+.toggle-sw input:checked + .toggle-track::after { transform: translateX(16px); }
+#mapLockToggle:not(:checked) + .toggle-track { background: #f59e0b; }
+
+.right {
+  background: var(--bg); border-left: 1px solid var(--bdr);
+  display: flex; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+.filter-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; background: var(--surf);
+  border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+.fb-label {
+  font-size: 10px; font-weight: 700; color: var(--t4);
+  text-transform: uppercase; letter-spacing: .07em;
+  white-space: nowrap; margin-right: 2px;
+}
+.fb-btn {
+  padding: 4px 11px; border-radius: 999px;
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--bdr2); background: var(--surf2); color: var(--t3);
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.fb-btn:hover { border-color: var(--blue-md); color: var(--blue); background: var(--blue-lt); }
+.fb-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 2px 8px rgba(26,107,255,.25); }
+.trips-body {
+  flex: 1 1 0; overflow-y: auto; min-height: 0;
+  padding: 10px; display: flex; flex-direction: column; gap: 9px;
+}
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 10px;
+  color: var(--t4); text-align: center; padding: 20px;
+}
+.empty-ico { font-size: 38px; opacity: .4; }
+.empty-txt { font-size: 13px; font-weight: 500; line-height: 1.65; }
+.tc {
+  background: var(--surf); border: 1.5px solid var(--bdr);
+  border-radius: var(--rl); overflow: hidden;
+  box-shadow: var(--s1); flex-shrink: 0;
+  animation: tcIn .28s ease both; transition: box-shadow .2s, opacity .25s;
+}
+.tc:hover { box-shadow: var(--s2); }
+@keyframes tcIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tc.dimmed { opacity: .28; pointer-events: none; }
+.tc-head {
+  padding: 10px 13px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--bdr);
+  border-left: 4px solid var(--clr, var(--blue));
+  cursor: pointer; user-select: none;
+}
+.tc-head:hover { background: var(--surf2); }
+.tc-head-l { display: flex; align-items: center; gap: 8px; }
+.tc-badge {
+  width: 28px; height: 28px; border-radius: var(--rr);
+  background: var(--clr, var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.tc-nm   { font-size: 13px; font-weight: 700; color: var(--t1); }
+.tc-meta { font-size: 10.5px; color: var(--t3); margin-top: 1px; }
+.tc-stats { display: flex; gap: 10px; align-items: flex-end; }
+.tc-sv { font-size: 14px; font-weight: 700; color: var(--t1); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tc-sv.c { color: var(--clr, var(--blue)); }
+.tc-sl { font-size: 9px; font-weight: 700; color: var(--t4); text-transform: uppercase; letter-spacing: .06em; }
+.tc-route {
+  padding: 6px 13px; background: var(--surf2); border-bottom: 1px solid var(--bdr);
+  font-size: 11.5px; color: var(--t3); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tc-route .rb { color: var(--clr, var(--blue)); font-weight: 700; }
+.tc-info-row {
+  padding: 6px 13px; background: var(--surf3); border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; color: var(--t3);
+}
+.tc-info-row .inf-val { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--t1); }
+.tc-info-row .inf-eta { font-family: var(--mono); font-size: 11.5px; color: var(--t3); }
+.tc-info-row .inf-sep { color: var(--bdr2); font-size: 14px; }
+.tc-info-row .inf-rev { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--green); margin-left: auto; }
+.traffic-badge {
+  font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+}
+.traffic-badge.clear    { background: var(--green-lt); color: var(--green); }
+.traffic-badge.moderate { background: #fef3c7; color: #b45309; }
+.traffic-badge.heavy    { background: #fee2e2; color: #dc2626; }
+.tc-cap-bar  { height: 3px; background: var(--bdr); }
+.tc-cap-fill { height: 100%; background: var(--clr, var(--blue)); opacity: .7; transition: width .7s cubic-bezier(.23,1,.32,1); }
+.tc-orders { padding: 5px 13px 10px; }
+.tc-order {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 0; border-bottom: 1px solid #edf0f7; font-size: 12.5px;
+}
+.tc-order:last-child { border-bottom: none; }
+.tc-odot { width: 7px; height: 7px; border-radius: 50%; background: var(--clr, var(--blue)); flex-shrink: 0; }
+.tc-oloc { flex: 1; font-weight: 600; color: var(--t1); }
+.tc-owt  { color: var(--t3); font-family: var(--mono); font-size: 11.5px; }
+.tc-orev { font-weight: 700; color: var(--clr, var(--blue)); font-family: var(--mono); font-size: 12px; margin-left: 8px; }
+.sum-bar {
+  background: var(--surf); border-top: 1px solid var(--bdr);
+  padding: 9px 14px; display: grid; grid-template-columns: 1fr 1fr 1fr; flex-shrink: 0;
+}
+.sb { text-align: center; padding: 3px 0; }
+.sb:not(:last-child) { border-right: 1px solid var(--bdr); }
+.sb-v { font-size: 18px; font-weight: 800; color: var(--t1); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.sb-v.b { color: var(--blue); }
+.sb-v.g { color: var(--green); }
+.sb-l { font-size: 9px; font-weight: 700; color: var(--t4); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hb">
+    <div class="hb-icon">📦</div>
+    <div>
+      <div class="hb-name">Pune<em>Deliver</em></div>
+      <div class="hb-sub">Local Delivery Optimizer · Multi-Trip Management</div>
+    </div>
+  </div>
+  <div class="hb-pills">
+    <div class="hp blue">🚛 40 kg / trip · 40 km/h avg</div>
+    <div class="hp">📍 Pune Delivery Center → 10 Zones</div>
+  </div>
+</header>
+
+<div class="app">
+
+  <div class="left">
+    <div class="pane-hd">
+      <div class="pane-title">
+        Orders Queue
+        <span id="cntLbl" style="font-size:11px;color:var(--t4);text-transform:none;font-weight:500;letter-spacing:0;">0 / 10</span>
+      </div>
+      <div class="pane-sub">Max 40 kg per item · Max 10 orders</div>
+    </div>
+    <div class="order-list" id="orderList"></div>
+    <div class="left-foot">
+      <div class="oq-row">
+        <span>Orders: <strong id="cntNum">0</strong> / 10</span>
+        <span id="wtLbl" style="font-size:11px;color:var(--t3);">0 kg queued</span>
+      </div>
+      <div class="oq-bar"><div class="oq-fill" id="oqFill" style="width:0%"></div></div>
+      <button class="btn-add" id="btnAdd" onclick="addOrder()">＋ &nbsp;Add Order</button>
+      <button class="btn-gen" id="btnGen" onclick="generatePlan()">⚡ &nbsp;Generate Trip Plan</button>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="map-tag" id="mapTag">⏳ Loading from database...</div>
+    <div id="vis-net"></div>
+    <div class="map-leg">
+      <div class="ml-title">Legend</div>
+      <div class="ml-row">
+        <div class="ml-box" style="background:#1a6bff;border:2px solid #1254d0;width:12px;height:12px;border-radius:4px;"></div>
+        Pune Delivery Center
+      </div>
+      <div class="ml-row">
+        <div class="ml-dot" style="background:#e8edf5;border:1.5px solid #94a3b8;"></div>
+        Delivery Zone
+      </div>
+      <div class="ml-sep"></div>
+      <div class="ml-row"><div class="ml-dot" style="background:var(--trip0);"></div> Trip 1 · Blue</div>
+      <div class="ml-row"><div class="ml-dot" style="background:var(--trip1);"></div> Trip 2 · Green</div>
+      <div class="ml-row"><div class="ml-dot" style="background:var(--trip2);"></div> Trip 3 · Amber</div>
+      <div class="ml-row"><div class="ml-dot" style="background:var(--trip3);"></div> Trip 4 · Violet</div>
+      <div class="ml-sep"></div>
+      <div class="ml-row" id="leg-clear"><div class="ml-line" style="background:var(--tc-clear);"></div> Clear road</div>
+      <div class="ml-row" id="leg-mod">  <div class="ml-line" style="background:var(--tc-mod);"></div>   Moderate traffic</div>
+      <div class="ml-row" id="leg-heavy"><div class="ml-line" style="background:var(--tc-heavy);"></div> Heavy traffic</div>
+      <div class="map-controls-row">
+        <div class="ctrl-row">
+          <span class="ctrl-label">Show Traffic</span>
+          <label class="toggle-sw" title="Toggle traffic colours">
+            <input type="checkbox" id="trafficToggle" checked onchange="applyTrafficVisual()"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label" id="lockLabel">🔒 Map Locked</span>
+          <label class="toggle-sw" title="Lock/Unlock map layout">
+            <input type="checkbox" id="mapLockToggle" onchange="toggleMapLock()"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="pane-hd" style="background:var(--surf);border-bottom:1px solid var(--bdr);">
+      <div class="pane-title">
+        Trip Plan
+        <span id="tripCntLbl" style="font-size:11px;color:var(--t4);text-transform:none;font-weight:500;letter-spacing:0;">—</span>
+      </div>
+      <div class="pane-sub">Knapsack + Dijkstra · Traffic-aware · ETA included</div>
+    </div>
+    <div class="filter-bar" id="filterBar" style="display:none;">
+      <span class="fb-label">Filter:</span>
+    </div>
+    <div class="trips-body" id="tripsBody">
+      <div class="empty" id="emptyEl">
+        <div class="empty-ico">🗺️</div>
+        <div class="empty-txt">
+          Add orders on the left,<br/>
+          then click <strong>Generate Trip Plan</strong><br/>
+          to see optimised multi-trip routes here.
+        </div>
+      </div>
+    </div>
+    <div class="sum-bar" id="sumBar" style="display:none;">
+      <div class="sb"><div class="sb-v b" id="sumTrips">—</div><div class="sb-l">Trips</div></div>
+      <div class="sb"><div class="sb-v"   id="sumKm">—</div>   <div class="sb-l">Total km</div></div>
+      <div class="sb"><div class="sb-v g" id="sumRev">—</div>  <div class="sb-l">Revenue ₹</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════
+   DATA — populated from MySQL via FastAPI on page load
+═══════════════════════════════════════════════════════════ */
+let CITY_DATA = [];
+let ROAD_DATA = [];
+let N         = 0;
+let NAMES     = [];
+let ADJ       = [];
+
+const TRAFFIC_LEVELS = ["clear","moderate","heavy"];
+const TRAFFIC_MULT   = { clear:1.0, moderate:1.5, heavy:2.2 };
+const TRAFFIC_COLOR  = { clear:"#22c55e", moderate:"#f59e0b", heavy:"#ef4444", neutral:"#94a3b8" };
+const BASE_SPEED_KMH = 40;
+const VEHICLE_CAP    = 40;
+
+/* ── ETA helpers ── */
+function etaMins(baseKm, traffic) {
+  return Math.round((baseKm * TRAFFIC_MULT[traffic] / BASE_SPEED_KMH) * 60);
+}
+function edgeMapLabel(baseKm, traffic) {
+  const mins  = etaMins(baseKm, traffic);
+  const effKm = Math.round(baseKm * TRAFFIC_MULT[traffic]);
+  const km    = traffic === "clear" ? `${baseKm} km` : `${baseKm} km (~${effKm})`;
+  return `${km}\n[~${mins} min]`;
+}
+
+/* ── Adjacency ── */
+function rebuildAdjacency() {
+  ADJ = Array.from({ length: N }, () => []);
+  ROAD_DATA.forEach(r => {
+    const w      = Math.round(r.baseKm * TRAFFIC_MULT[r.traffic]);
+    const edgeId = `${Math.min(r.from,r.to)}-${Math.max(r.from,r.to)}`;
+    if (!ADJ[r.from].find(e => e.to === r.to))  ADJ[r.from].push({ to:r.to,   w, edgeId });
+    if (!ADJ[r.to].find(e => e.to === r.from))   ADJ[r.to].push({   to:r.from, w, edgeId });
+  });
+}
+
+function randomizeTraffic() {
+  ROAD_DATA.forEach(r => {
+    r.traffic = TRAFFIC_LEVELS[Math.floor(Math.random() * TRAFFIC_LEVELS.length)];
+  });
+  rebuildAdjacency();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FETCH FROM DATABASE AND BOOT
+═══════════════════════════════════════════════════════════ */
+async function loadDataAndBoot() {
+  try {
+    document.getElementById("mapTag").textContent = "⏳ Loading from database...";
+
+    const [citiesRes, roadsRes] = await Promise.all([
+      fetch("/api/cities"),
+      fetch("/api/roads")
+    ]);
+
+    if (!citiesRes.ok || !roadsRes.ok) throw new Error("API fetch failed");
+
+    const citiesJson = await citiesRes.json();
+    const roadsJson  = await roadsRes.json();
+
+    CITY_DATA = citiesJson;
+    N         = CITY_DATA.length;
+    NAMES     = CITY_DATA.map(c => c.name);
+
+    const cityIndex = {};
+    CITY_DATA.forEach(c => { cityIndex[c.name] = c.id; });
+
+    ROAD_DATA = roadsJson.map(r => ({
+      from:    cityIndex[r.From_City],
+      to:      cityIndex[r.To_City],
+      baseKm:  parseFloat(r.Distance),
+      traffic: r.Traffic_Level
+    })).filter(r => r.from !== undefined && r.to !== undefined);
+
+    rebuildAdjacency();
+
+    document.getElementById("mapTag").textContent = "📍 Pune Delivery Network · Live Traffic + ETA";
+
+    buildGraph();
+
+    if (CITY_DATA.length > 5) {
+      [
+        { node: CITY_DATA[1].id, weight:12, revenue:350 },
+        { node: CITY_DATA[3].id, weight:18, revenue:480 },
+        { node: CITY_DATA[6].id, weight:8,  revenue:220 },
+        { node: CITY_DATA[9].id, weight:15, revenue:400 },
+        { node: CITY_DATA[4].id, weight:22, revenue:550 },
+      ].forEach(p => addOrder(p));
+    }
+
+    refreshMeta();
+
+  } catch (err) {
+    console.error("Database load failed:", err);
+    document.getElementById("mapTag").textContent = "❌ Database connection failed — is uvicorn running?";
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ALGORITHMS
+═══════════════════════════════════════════════════════════ */
+function dijkstra(src) {
+  const dist = Array(N).fill(Infinity);
+  const prev = Array(N).fill(-1);
+  const vis  = Array(N).fill(false);
+  dist[src]  = 0;
+  for (let i = 0; i < N; i++) {
+    let u = -1;
+    for (let j = 0; j < N; j++)
+      if (!vis[j] && (u === -1 || dist[j] < dist[u])) u = j;
+    if (u === -1 || dist[u] === Infinity) break;
+    vis[u] = true;
+    ADJ[u].forEach(({ to, w }) => {
+      if (dist[u] + w < dist[to]) { dist[to] = dist[u] + w; prev[to] = u; }
+    });
+  }
+  return { dist, prev };
+}
+
+function getPath(prev, target) {
+  const p = [];
+  for (let c = target; c !== -1; c = prev[c]) p.unshift(c);
+  return p;
+}
+
+function knapsack(orders, cap) {
+  const n  = orders.length;
+  const W  = Math.round(cap * 10);
+  const ws = orders.map(o => Math.round(o.weight * 10));
+  const vs = orders.map(o => o.revenue);
+  const dp   = Array(W + 1).fill(0);
+  const keep = Array.from({ length: n }, () => Array(W + 1).fill(false));
+  for (let i = 0; i < n; i++)
+    for (let w = W; w >= ws[i]; w--)
+      if (dp[w - ws[i]] + vs[i] > dp[w]) {
+        dp[w] = dp[w - ws[i]] + vs[i];
+        keep[i][w] = true;
+      }
+  const sel = []; let w = W;
+  for (let i = n - 1; i >= 0; i--)
+    if (keep[i][w]) { sel.push(i); w -= ws[i]; }
+  return sel;
+}
+
+function buildRoute(stopNodes) {
+  const unvisited = [...stopNodes];
+  const seq       = [0];
+  let cur         = 0;
+  let totalDist   = 0;
+  let totalMins   = 0;
+
+  while (unvisited.length > 0) {
+    const { dist } = dijkstra(cur);
+    let bi = 0, bd = Infinity;
+    unvisited.forEach((nid, i) => { if (dist[nid] < bd) { bd = dist[nid]; bi = i; } });
+    cur = unvisited.splice(bi, 1)[0];
+    totalDist += bd;
+    seq.push(cur);
+  }
+
+  const { dist: back } = dijkstra(cur);
+  totalDist += back[0];
+  seq.push(0);
+
+  for (let i = 0; i < seq.length - 1; i++) {
+    const { prev } = dijkstra(seq[i]);
+    const path = getPath(prev, seq[i + 1]);
+    for (let j = 0; j < path.length - 1; j++) {
+      const a = path[j], b = path[j + 1];
+      const rd = ROAD_DATA.find(r =>
+        (r.from === a && r.to === b) || (r.from === b && r.to === a)
+      );
+      if (rd) totalMins += etaMins(rd.baseKm, rd.traffic);
+    }
+  }
+
+  return { seq, totalDist: Math.round(totalDist), totalMins };
+}
+
+function collectRouteEdges(seq) {
+  const s = new Set();
+  for (let i = 0; i < seq.length - 1; i++) {
+    const { prev } = dijkstra(seq[i]);
+    const path = getPath(prev, seq[i + 1]);
+    for (let j = 0; j < path.length - 1; j++)
+      s.add(`${Math.min(path[j],path[j+1])}-${Math.max(path[j],path[j+1])}`);
+  }
+  return s;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MULTI-TRIP PLANNER
+═══════════════════════════════════════════════════════════ */
+let lastTrips = [];
+
+function generatePlan() {
+  const all = collectOrders();
+  if (!all.length) { alert("Add at least one valid order first."); return; }
+
+  randomizeTraffic();
+  refreshEdgeTrafficVisual();
+
+  let remaining = all.map((o, i) => ({ ...o, _oi: i }));
+  const trips   = [];
+
+  while (remaining.length > 0) {
+    let sel = knapsack(remaining, VEHICLE_CAP);
+    if (!sel.length) sel = [0];
+
+    const tripOrders = sel.map(i => remaining[i]);
+    const stopNodes  = [...new Set(tripOrders.map(o => o.nodeId))];
+    const { seq, totalDist, totalMins } = buildRoute(stopNodes);
+    const edgesUsed  = collectRouteEdges(seq);
+
+    let worst = "clear";
+    edgesUsed.forEach(eid => {
+      const r = ROAD_DATA.find(r =>
+        `${Math.min(r.from,r.to)}-${Math.max(r.from,r.to)}` === eid
+      );
+      if (r) {
+        if (r.traffic === "heavy") worst = "heavy";
+        else if (r.traffic === "moderate" && worst !== "heavy") worst = "moderate";
+      }
+    });
+
+    trips.push({
+      orders: tripOrders, stopNodes, seq, edgesUsed,
+      totalDist, totalMins, worstTraffic: worst,
+      totalWeight:  +tripOrders.reduce((s, o) => s + o.weight, 0).toFixed(1),
+      totalRevenue:  tripOrders.reduce((s, o) => s + o.revenue, 0),
+    });
+
+    const ss = new Set(sel);
+    remaining = remaining.filter((_, i) => !ss.has(i));
+  }
+
+  lastTrips = trips;
+  renderTripCards(trips);
+  buildFilterBar(trips);
+  applyFilter("all");
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TRIP PALETTE
+═══════════════════════════════════════════════════════════ */
+const T_CLR  = ["#1a6bff","#0ca85a","#e07b09","#7730e8"];
+const T_NAME = ["Trip 1","Trip 2","Trip 3","Trip 4"];
+const tripColor = ti => T_CLR[ti % T_CLR.length];
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER TRIP CARDS
+═══════════════════════════════════════════════════════════ */
+function renderTripCards(trips) {
+  const body = document.getElementById("tripsBody");
+  body.innerHTML = "";
+  let grandKm = 0, grandRev = 0;
+
+  trips.forEach((t, ti) => {
+    grandKm  += t.totalDist;
+    grandRev += t.totalRevenue;
+
+    const col    = tripColor(ti);
+    const capPct = Math.min(100, Math.round((t.totalWeight / VEHICLE_CAP) * 100));
+    const label  = T_NAME[ti] || `Trip ${ti + 1}`;
+    const etaStr = t.totalMins >= 60
+      ? `${Math.floor(t.totalMins/60)}h ${t.totalMins%60}m`
+      : `${t.totalMins} min`;
+    const routeStr = t.seq.map(id =>
+      id === 0 ? `<span class="rb">PDC</span>` : NAMES[id].split(" ")[0]
+    ).join(" → ");
+    const tbText  = { clear:"✓ Clear", moderate:"⚠ Moderate", heavy:"🔴 Heavy" }[t.worstTraffic];
+
+    const ordHtml = t.orders.map(o => `
+      <div class="tc-order">
+        <div class="tc-odot"></div>
+        <div class="tc-oloc">${o.loc}</div>
+        <div class="tc-owt">${o.weight} kg</div>
+        <div class="tc-orev">₹${o.revenue.toLocaleString("en-IN")}</div>
+      </div>`).join("");
+
+    const card = document.createElement("div");
+    card.className = "tc";
+    card.dataset.trip = ti;
+    card.style.cssText = `--clr:${col};animation-delay:${ti * 70}ms`;
+    card.innerHTML = `
+      <div class="tc-head" onclick="applyFilter(${ti})">
+        <div class="tc-head-l">
+          <div class="tc-badge">${ti + 1}</div>
+          <div>
+            <div class="tc-nm">${label}</div>
+            <div class="tc-meta">${t.stopNodes.length} zone${t.stopNodes.length!==1?"s":""} · ${t.orders.length} order${t.orders.length!==1?"s":""} · ${capPct}% cap</div>
+          </div>
+        </div>
+        <div class="tc-stats">
+          <div style="text-align:right">
+            <div class="tc-sv c">${t.totalWeight} kg</div>
+            <div class="tc-sl">Loaded</div>
+          </div>
+        </div>
+      </div>
+      <div class="tc-route">${routeStr}</div>
+      <div class="tc-info-row">
+        <span>🗺</span>
+        <span class="inf-val">${t.totalDist} km</span>
+        <span class="inf-eta">[~${etaStr}]</span>
+        <span class="inf-sep">|</span>
+        <span style="font-size:12px;">Revenue</span>
+        <span class="inf-rev">₹${t.totalRevenue.toLocaleString("en-IN")}</span>
+        <span class="traffic-badge ${t.worstTraffic}">${tbText}</span>
+      </div>
+      <div class="tc-cap-bar"><div class="tc-cap-fill" style="width:${capPct}%"></div></div>
+      <div class="tc-orders">${ordHtml}</div>`;
+
+    body.appendChild(card);
+  });
+
+  document.getElementById("sumTrips").textContent = trips.length;
+  document.getElementById("sumKm").textContent    = grandKm;
+  document.getElementById("sumRev").textContent   = grandRev.toLocaleString("en-IN");
+  document.getElementById("sumBar").style.display = "grid";
+  document.getElementById("tripCntLbl").textContent = `${trips.length} trip${trips.length!==1?"s":""}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER BAR
+═══════════════════════════════════════════════════════════ */
+let activeFilter = "all";
+
+function buildFilterBar(trips) {
+  const bar = document.getElementById("filterBar");
+  bar.style.display = "flex";
+  [...bar.querySelectorAll(".fb-btn")].forEach(b => b.remove());
+
+  const allBtn = document.createElement("button");
+  allBtn.className   = "fb-btn active";
+  allBtn.dataset.key = "all";
+  allBtn.textContent = "All Trips";
+  allBtn.onclick     = () => applyFilter("all");
+  bar.appendChild(allBtn);
+
+  trips.forEach((_, ti) => {
+    const btn = document.createElement("button");
+    btn.className   = "fb-btn";
+    btn.dataset.key = String(ti);
+    btn.textContent = T_NAME[ti] || `Trip ${ti+1}`;
+    btn.onclick     = () => applyFilter(ti);
+    bar.appendChild(btn);
+  });
+}
+
+function applyFilter(key) {
+  activeFilter = key;
+  document.querySelectorAll(".fb-btn").forEach(b =>
+    b.classList.toggle("active", String(b.dataset.key) === String(key))
+  );
+  document.querySelectorAll(".tc").forEach(card => {
+    const ti = parseInt(card.dataset.trip);
+    card.classList.toggle("dimmed", key !== "all" && ti !== key);
+  });
+  if (key === "all") {
+    colorGraph(lastTrips, "all");
+    restoreNodeLabels();
+  } else {
+    colorGraph(lastTrips, key);
+    applySequenceLabels(lastTrips[key], key);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NODE / EDGE FONT CONSTANTS
+═══════════════════════════════════════════════════════════ */
+const NODE_FONT_BASE = {
+  color: "#ffffff", size: 12,
+  face: "Plus Jakarta Sans, system-ui, sans-serif",
+  strokeWidth: 3, strokeColor: "rgba(18,84,208,.7)",
+};
+const NODE_FONT_DEFAULT = {
+  color: "#0b1828", size: 13,
+  face: "Plus Jakarta Sans, system-ui, sans-serif",
+  strokeWidth: 2, strokeColor: "rgba(255,255,255,.9)",
+};
+const NODE_FONT_ACTIVE = {
+  color: "#0b1828", size: 13,
+  face: "Plus Jakarta Sans, system-ui, sans-serif",
+  strokeWidth: 4, strokeColor: "rgba(255,255,255,0.98)",
+  bold: { color:"#0b1828", size:13 },
+};
+
+function edgeFontDefault() {
+  return {
+    color: "#0b1828", size: 12,
+    face: "JetBrains Mono, monospace",
+    align: "middle", background: "rgba(255,255,255,.88)",
+    strokeWidth: 0, bold: false,
+  };
+}
+function edgeFontHighlighted() {
+  return {
+    color: "#0b1828", size: 12,
+    face: "JetBrains Mono, monospace",
+    align: "middle", background: "rgba(255,255,255,.97)",
+    strokeWidth: 0, bold: true,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIS-NETWORK GRAPH
+═══════════════════════════════════════════════════════════ */
+let network, nodesDS, edgesDS;
+
+const PHYSICS_SPREAD = {
+  enabled: true,
+  solver: "repulsion",
+  repulsion: {
+    nodeDistance: 220, centralGravity: 0,
+    springLength: 0, springConstant: 0, damping: 1,
+  },
+  stabilization: { enabled: true, iterations: 150, fit: true },
+};
+const PHYSICS_OFF = { enabled: false };
+
+function buildGraph() {
+  const nodeList = CITY_DATA.map(c => ({
+    id:    c.id,
+    label: c.isBase ? "🏭  Pune\nDelivery Center" : c.name,
+    shape: c.isBase ? "box" : "dot",
+    size:  c.isBase ? 26 : 16,
+    color: {
+      background: c.isBase ? "#1a6bff" : "#edf1fa",
+      border:     c.isBase ? "#1254d0" : "#94a3b8",
+      highlight:  { background: c.isBase ? "#1254d0" : "#dde7ff", border: "#1a6bff" },
+      hover:      { background: c.isBase ? "#1254d0" : "#dde7ff", border: "#1a6bff" },
+    },
+    font:        c.isBase ? NODE_FONT_BASE : NODE_FONT_DEFAULT,
+    borderWidth: c.isBase ? 3 : 1.5,
+    shadow: {
+      enabled: true,
+      color:   c.isBase ? "rgba(26,107,255,.35)" : "rgba(11,24,40,.10)",
+      size:    c.isBase ? 18 : 7, x:0, y:3,
+    },
+    fixed: false,
+    x: c.isBase ? 0 : undefined,
+    y: c.isBase ? 0 : undefined,
+  }));
+
+  nodesDS = new vis.DataSet(nodeList);
+  edgesDS = new vis.DataSet(buildEdgeList());
+
+  network = new vis.Network(
+    document.getElementById("vis-net"),
+    { nodes: nodesDS, edges: edgesDS },
+    {
+      physics: PHYSICS_SPREAD,
+      interaction: {
+        dragNodes: true, hover: true,
+        tooltipDelay: 120, zoomView: true, dragView: true,
+      },
+      layout: { improvedLayout: false },
+    }
+  );
+
+  network.once("stabilizationIterationsDone", () => {
+    network.setOptions({ physics: PHYSICS_OFF });
+    document.getElementById("mapLockToggle").checked = true;
+    syncLockUI(true);
+  });
+}
+
+function toggleMapLock() {
+  const locked = document.getElementById("mapLockToggle").checked;
+  syncLockUI(locked);
+}
+
+function syncLockUI(locked) {
+  const label  = document.getElementById("lockLabel");
+  const mapTag = document.getElementById("mapTag");
+  if (locked) {
+    network.setOptions({ physics: PHYSICS_OFF, interaction: { dragNodes: false } });
+    label.textContent = "🔒 Map Locked";
+    mapTag.classList.remove("unlocked");
+  } else {
+    network.setOptions({ physics: PHYSICS_OFF, interaction: { dragNodes: true } });
+    label.textContent = "🔓 Map Unlocked — drag nodes freely";
+    mapTag.classList.add("unlocked");
+  }
+}
+
+function buildEdgeList() {
+  const trafficOn = document.getElementById("trafficToggle")?.checked ?? true;
+  const seen = new Set();
+  const list = [];
+
+  ROAD_DATA.forEach(r => {
+    const key = `${Math.min(r.from,r.to)}-${Math.max(r.from,r.to)}`;
+    if (seen.has(key)) return; seen.add(key);
+
+    const tCol   = trafficOn ? TRAFFIC_COLOR[r.traffic] : TRAFFIC_COLOR.neutral;
+    const lbl    = edgeMapLabel(r.baseKm, r.traffic);
+    const w      = r.traffic === "heavy" ? 3 : r.traffic === "moderate" ? 2.5 : 2;
+    const dashes = trafficOn && r.traffic === "heavy" ? [6,3] : false;
+
+    list.push({
+      id: key, from: r.from, to: r.to,
+      label: lbl,
+      color: { color:tCol, highlight:tCol, hover:tCol, opacity:0.88 },
+      width: w, dashes: dashes,
+      font: edgeFontDefault(),
+      smooth: { type:"continuous" },
+      arrows: { to: false },
+    });
+  });
+  return list;
+}
+
+function applyTrafficVisual() {
+  refreshEdgeTrafficVisual();
+  applyFilter(activeFilter);
+}
+
+function refreshEdgeTrafficVisual() {
+  const trafficOn = document.getElementById("trafficToggle").checked;
+  ["leg-clear","leg-mod","leg-heavy"].forEach(id => {
+    document.getElementById(id).style.opacity = trafficOn ? "1" : "0.3";
+  });
+  edgesDS.clear();
+  edgesDS.add(buildEdgeList());
+}
+
+function restoreNodeLabels() {
+  CITY_DATA.forEach(c => {
+    nodesDS.update({
+      id:    c.id,
+      label: c.isBase ? "🏭  Pune\nDelivery Center" : c.name,
+      color: {
+        background: c.isBase ? "#1a6bff" : "#edf1fa",
+        border:     c.isBase ? "#1254d0" : "#94a3b8",
+        highlight:  { background: c.isBase ? "#1254d0" : "#dde7ff", border: "#1a6bff" },
+        hover:      { background: c.isBase ? "#1254d0" : "#dde7ff", border: "#1a6bff" },
+      },
+      font:   c.isBase ? NODE_FONT_BASE : NODE_FONT_DEFAULT,
+      size:   c.isBase ? 26 : 16,
+      shadow: {
+        enabled: true,
+        color:   c.isBase ? "rgba(26,107,255,.35)" : "rgba(11,24,40,.10)",
+        size:    c.isBase ? 18 : 7, x:0, y:3,
+      },
+    });
+  });
+}
+
+function applySequenceLabels(trip, ti) {
+  if (!trip) return;
+  const col = tripColor(ti);
+  trip.seq.forEach((nodeId, seqIdx) => {
+    if (nodeId === 0) return;
+    const city = CITY_DATA.find(c => c.id === nodeId);
+    if (!city) return;
+    nodesDS.update({
+      id:    nodeId,
+      label: `${seqIdx}. ${city.name}`,
+      color: {
+        background: col, border: col,
+        highlight: { background: col, border: "#fff" },
+        hover:     { background: col, border: "#fff" },
+      },
+      font: NODE_FONT_ACTIVE, size: 22,
+      shadow: { enabled:true, color:col+"55", size:18, x:0, y:0 },
+    });
+  });
+  nodesDS.update({
+    id: 0,
+    label: "🏭  Start / End\nPune Delivery Center",
+    color: {
+      background: "#1a6bff", border: "#0f3fa0",
+      highlight: { background:"#1254d0", border:"#fff" },
+      hover:     { background:"#1254d0", border:"#fff" },
+    },
+    font: { ...NODE_FONT_BASE, size:11 }, size: 28,
+    shadow: { enabled:true, color:"rgba(26,107,255,.42)", size:22, x:0, y:0 },
+  });
+}
+
+function colorGraph(trips, focusTripIdx) {
+  restoreNodeLabels();
+  refreshEdgeTrafficVisual();
+
+  const idxs = focusTripIdx === "all"
+    ? trips.map((_, i) => i)
+    : [focusTripIdx];
+
+  idxs.forEach(ti => {
+    const t   = trips[ti];
+    const col = tripColor(ti);
+    t.stopNodes.forEach(nid => {
+      nodesDS.update({
+        id: nid,
+        color: {
+          background: col, border: col,
+          highlight: { background:col, border:"#fff" },
+          hover:     { background:col, border:"#fff" },
+        },
+        font: NODE_FONT_ACTIVE, size: 22,
+        shadow: { enabled:true, color:col+"55", size:18, x:0, y:0 },
+      });
+    });
+    t.edgesUsed.forEach(eid => {
+      if (!edgesDS.get(eid)) return;
+      edgesDS.update({
+        id: eid,
+        color: { color:col, highlight:col, hover:col },
+        width: 5.5, dashes: false,
+        shadow: { enabled:true, color:col+"44", size:14, x:0, y:0 },
+        font: edgeFontHighlighted(),
+        smooth: { type:"continuous" },
+      });
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ORDER MANAGEMENT
+═══════════════════════════════════════════════════════════ */
+function collectOrders() {
+  return [...document.querySelectorAll(".ocard")].map(r => ({
+    nodeId:  parseInt(r.querySelector(".sel-n").value),
+    weight:  parseFloat(r.querySelector(".inp-w").value) || 0,
+    revenue: parseInt(r.querySelector(".inp-r").value)   || 0,
+    loc:     NAMES[parseInt(r.querySelector(".sel-n").value)],
+  })).filter(o => o.weight > 0 && o.weight <= VEHICLE_CAP && o.revenue > 0);
+}
+
+function addOrder(preset) {
+  const list = document.getElementById("orderList");
+  if (list.children.length >= 10) return;
+
+  const num  = list.children.length + 1;
+  const opts = CITY_DATA.slice(1).map(c =>
+    `<option value="${c.id}"${preset && preset.node === c.id ? " selected" : ""}>${c.name}</option>`
+  ).join("");
+
+  const card = document.createElement("div");
+  card.className = "ocard";
+  card.innerHTML = `
+    <div class="ocard-num">#${String(num).padStart(2,"0")}</div>
+    <div class="ocard-loc">
+      <div class="fl">
+        <div class="fl-lbl">Delivery Location</div>
+        <select class="sel-n">${opts}</select>
+      </div>
+    </div>
+    <div class="ocard-row">
+      <div class="fl">
+        <div class="fl-lbl">Weight (kg)</div>
+        <input class="inp-w" type="number" min="0.5" max="40" step="0.5"
+               value="${preset?.weight ?? 5}" placeholder="kg"/>
+        <div class="weight-err">⚠ Max 40 kg per item</div>
+      </div>
+      <div class="fl">
+        <div class="fl-lbl">Revenue (₹)</div>
+        <input class="inp-r" type="number" min="1" step="10"
+               value="${preset?.revenue ?? 100}" placeholder="₹"/>
+      </div>
+      <button class="btn-rm" title="Remove" onclick="removeOrder(this)">✕</button>
+    </div>`;
+
+  list.appendChild(card);
+
+  const wInput = card.querySelector(".inp-w");
+  const wErr   = card.querySelector(".weight-err");
+  const validate = () => {
+    const bad = parseFloat(wInput.value) > VEHICLE_CAP;
+    wInput.classList.toggle("err", bad);
+    wErr.classList.toggle("show", bad);
+    refreshMeta();
+  };
+  wInput.addEventListener("input",  validate);
+  wInput.addEventListener("change", () => {
+    if (parseFloat(wInput.value) > VEHICLE_CAP) wInput.value = VEHICLE_CAP;
+    validate();
+  });
+
+  refreshMeta();
+}
+
+function removeOrder(btn) {
+  btn.closest(".ocard").remove();
+  document.querySelectorAll(".ocard-num").forEach((el, i) =>
+    el.textContent = `#${String(i+1).padStart(2,"0")}`
+  );
+  refreshMeta();
+}
+
+function refreshMeta() {
+  const rows = document.querySelectorAll(".ocard");
+  const cnt  = rows.length;
+  let wt = 0;
+  rows.forEach(r => { wt += parseFloat(r.querySelector(".inp-w").value) || 0; });
+  document.getElementById("cntLbl").textContent  = `${cnt} / 10`;
+  document.getElementById("cntNum").textContent  = cnt;
+  document.getElementById("wtLbl").textContent   = `${wt.toFixed(1)} kg queued`;
+  document.getElementById("oqFill").style.width  = `${(cnt/10)*100}%`;
+  document.getElementById("btnAdd").disabled     = cnt >= 10;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", () => {
+  loadDataAndBoot();
+});
+</script>
+</body>
+</html>
